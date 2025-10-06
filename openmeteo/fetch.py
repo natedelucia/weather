@@ -10,9 +10,9 @@ from retry_requests import retry
 import numpy as np
 from openmeteo_sdk.WeatherApiResponse import WeatherApiResponse, VariablesWithTime
 
+from environment import validDays, validProperties
+
 # Used to determine a valid or invalid call to the fetchData method. Also used from environment.py
-validProperties: list[str] = ["temp", "humidity", "windSpeed", "windDirection"]
-validDays: list[int] = [1, 3, 7, 14, 16]
 
 # Used in construction of the API call
 propertiesMap: dict[str, list[str]] = {
@@ -118,7 +118,6 @@ def fetch_data(
         "hourly": callProperties,
         "temperature_unit": "fahrenheit",
         "wind_speed_unit": "ms",
-        "timezone": "America/Denver",  # I don't know if this is necessary but it currently doesn't change if we change the coords
         "forecast_days": days,
     }
 

@@ -3,7 +3,6 @@
 import time as tm
 from matplotlib import pyplot as plt
 import numpy as np
-import scipy.interpolate
 import fetch
 
 # Constants
@@ -27,7 +26,11 @@ coordinates: dict[str, tuple[float, float]] = {
     "Utah1": (37.931728, -113.053677),
     "Utah2": (37.945524, -113.033278),
     "Texas": (31.049802, -103.547313),
+    "UB": (43.000139, -78.790739),
 }
+
+validProperties: list[str] = ["temp", "humidity", "windSpeed", "windDirection"]
+validDays: list[int] = [1, 3, 7, 14, 16]
 
 
 class Environment:
@@ -78,7 +81,7 @@ class Environment:
 
 # Mostly for testing, but it does show the proper use of some of the functions so I guess I'll leave it
 def main():
-    env = Environment(*coordinates["Texas"])
+    env = Environment(*coordinates["UB"])
     env.fetchOpenMeteoData(fetch.validProperties, days=1)
     for height in range(0, 1000, 100):
         print(env.getAtHeight("windSpeed", height, 1))
