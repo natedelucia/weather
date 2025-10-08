@@ -9,6 +9,7 @@ import requests_cache
 from retry_requests import retry
 import numpy as np
 from openmeteo_sdk.WeatherApiResponse import WeatherApiResponse, VariablesWithTime
+import csv 
 
 from environment import validDays, validProperties
 
@@ -141,5 +142,8 @@ def fetch_data(
         ):  # for each height step of that property
             var[:, j % numHeightSteps] = hourly.Variables(j).ValuesAsNumpy()
         out[properties[i]] = var
-
+    for prop, data in out.items():
+        filename = f"{prop}_data.csv"
+        np.savetxt(filename, data, delimiter=",", fmt="%.5f")
+        print(f"Exported {filename}")
     return out
