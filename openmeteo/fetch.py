@@ -3,17 +3,16 @@ Fetches data from APIs
 Currently (and probably permanently) only uses OpenMeteo API
 """
 
-import environment
+from datetime import date
 import openmeteo_requests
 import requests_cache
 from retry_requests import retry
 import numpy as np
 from openmeteo_sdk.WeatherApiResponse import WeatherApiResponse, VariablesWithTime
-import csv 
 
-from environment import validDays, validProperties
+from utils import *
 
-# Used to determine a valid or invalid call to the fetchData method. Also used from environment.py
+DATA_DIR = "data/"
 
 # Used in construction of the API call
 propertiesMap: dict[str, list[str]] = {
@@ -76,26 +75,64 @@ propertiesMap: dict[str, list[str]] = {
 }
 
 
-def validateProperties(properties: list[str]) -> None:
-    """Determines is given properties are valid, throw exception if not. This isn't very good practice"""
-    validSet = set(validProperties)
-    actualSet = set(properties)
-    if not actualSet.issubset(validSet):
-        raise Exception(
-            f"{list(actualSet - validSet)} are not valid properties\nValid properties are {validProperties}"
-        )
+def fetch_data(url: str, params: dict) -> WeatherApiResponse:
+    cache_session = requests_cache.CachedSession(".cache", expire_after=3600)
+    retry_session = retry(cache_session, retries=5, backoff_factor=0.2)
+    client = openmeteo_requests.Client(session=retry_session)
+    response: WeatherApiResponse = client.weather_api(url, params=params)[0]
+    return response
 
 
-def validateDays(days: int) -> None:
-    """Determines if given number if days is valid, throws exception if not. This isn't very good practice"""
-    if days not in validDays:
-        raise Exception(
-            f"{days} is not a valid forecast range\nDays must be 1, 3, 7, 14, or 16"
-        )
+def process_data(
+    properties: list[str], hours: int, numHeightSteps: int, hourly: VariablesWithTime, dataDir: str
+):
+    out: dict[str, np.ndarray] = {}
+    for property in properties:
+        out[property] = np.zeros(
+            (hours, numHeightSteps)
+        )  # Each property in the output will be (hours x heightSteps) size
+
+    for i in range(len(properties)):  # for each property
+        var = np.zeros((hours, numHeightSteps))
+        for j in range(
+            numHeightSteps * i, numHeightSteps * (i + 1)
+        ):  # for each height step of that property
+            var[:, j % numHeightSteps] = hourly.Variables(j).ValuesAsNumpy()
+        out[properties[i]] = var
+    for prop, data in out.items():
+        filename = dataDir + f"{prop}_data.csv"
+        np.savetxt(filename, data, delimiter=",", fmt="%.5f")
+        print(f"Exported {filename}")
+    return out
+
+
+def fetch_historical_data(
+    lat: float, lon: float, properties: list[str], start_date: date, end_date: date
+) -> dict[str, np.ndarray]:
+    url = "https://historical-forecast-api.open-meteo.com/v1/forecast"
+    callProperties = [propertiesMap[prop] for prop in properties]
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "start_date": start_date,
+        "end_date": end_date,
+        "hourly": callProperties,
+        "temperature_unit": "fahrenheit",
+        "wind_speed_unit": "ms",
+    }
+
+    response: WeatherApiResponse = fetch_data(url, params)
+
+    hourly: VariablesWithTime = response.Hourly()
+
+    numHeightSteps = len(heightSteps)
+    hours = ((end_date - start_date).days + 1) * 24
+
+    return process_data(properties, hours, numHeightSteps, hourly, DATA_DIR + "historical/")
 
 
 # Calls the open-meteo api and returns a dictionary of each of the requested properties
-def fetch_data(
+def fetch_current_data(
     lat: float, lon: float, properties: list[str], days: int
 ) -> dict[str, np.ndarray]:
     """Fetch data from openMeteo API"""
@@ -126,24 +163,7 @@ def fetch_data(
 
     hourly: VariablesWithTime = response.Hourly()
 
-    numHeightSteps = len(environment.heightSteps)
+    numHeightSteps = len(heightSteps)
     hours = days * 24
 
-    out: dict[str, np.ndarray] = {}
-    for property in properties:
-        out[property] = np.zeros(
-            (hours, numHeightSteps)
-        )  # Each property in the output will be (hours x heightSteps) size
-
-    for i in range(len(properties)):  # for each property
-        var = np.zeros((hours, numHeightSteps))
-        for j in range(
-            numHeightSteps * i, numHeightSteps * (i + 1)
-        ):  # for each height step of that property
-            var[:, j % numHeightSteps] = hourly.Variables(j).ValuesAsNumpy()
-        out[properties[i]] = var
-    for prop, data in out.items():
-        filename = f"{prop}_data.csv"
-        np.savetxt(filename, data, delimiter=",", fmt="%.5f")
-        print(f"Exported {filename}")
-    return out
+    return process_data(properties, hours, numHeightSteps, hourly, DATA_DIR)

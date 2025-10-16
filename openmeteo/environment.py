@@ -1,36 +1,10 @@
 # defines the environment class, which contains all of the weather data for a given time and place
 
-import time as tm
+from datetime import date
 from matplotlib import pyplot as plt
 import numpy as np
-import fetch
-
-# Constants
-heightSteps: list[int] = [
-    110,
-    320,
-    500,
-    800,
-    1000,
-    1500,
-    1900,
-    3000,
-    4200,
-    5600,
-    7200,
-    9600,
-]
-
-coordinates: dict[str, tuple[float, float]] = {
-    "Spaceport America": (32.938358, -106.912406),
-    "Utah1": (37.931728, -113.053677),
-    "Utah2": (37.945524, -113.033278),
-    "Texas": (31.049802, -103.547313),
-    "UB": (43.000139, -78.790739),
-}
-
-validProperties: list[str] = ["temp", "humidity", "windSpeed", "windDirection"]
-validDays: list[int] = [1, 3, 7, 14, 16]
+from utils import *
+from fetch import *
 
 
 class Environment:
@@ -53,7 +27,7 @@ class Environment:
         Properties should be from list ["temp", "humidity", "windSpeed", "windDirection"]
         Days is number of days in the future to forecast, and should be in the list
         """
-        self.atmosphere = fetch.fetch_data(self.lat, self.lon, properties, days)
+        self.atmosphere = fetch_current_data(self.lat, self.lon, properties, days)
         return self.atmosphere
 
     def getAtHeight(self, property: str, height: int, hour: int):
@@ -64,7 +38,7 @@ class Environment:
         """
         if self.atmosphere == {}:
             raise Exception("Call the API before accessing environment data")
-        fetch.validateProperties([property])
+        validateProperties([property])
         if property not in self.atmosphere.keys():
             raise Exception(
                 f"{property} is valid, but was not given as a property to be retrieved from the API"
@@ -78,13 +52,29 @@ class Environment:
 
         return np.interp(height, heightSteps, self.atmosphere[property][hour])
 
+class HistoricalEnvironment(Environment):
+    def __init__(self, lat: float, lon: float, start_date: date, end_date: date) -> None:
+        super().__init__(lat, lon)
+        self.start_date = start_date
+        self.end_date = end_date
+    
+    def fetchOpenMeteoData(
+        self, properties: list[str], days: int
+    ) -> dict[str, np.ndarray]:
+        self.atmosphere = fetch_historical_data(self.lat, self.lon, properties, self.start_date, self.end_date)
+        return self.atmosphere
 
 # Mostly for testing, but it does show the proper use of some of the functions so I guess I'll leave it
 def main():
-    env = Environment(*coordinates["UB"])
-    env.fetchOpenMeteoData(fetch.validProperties, days=1)
-    for height in range(0, 1000, 100):
-        print(env.getAtHeight("windSpeed", height, 1))
+    env = HistoricalEnvironment(*coordinates["UB"], date(2024, 1, 1), date(2024, 1, 31))
+    env.fetchOpenMeteoData(validProperties, days=1)
+    print(env.getAtHeight("temp", 320, 3))
+
+    # env = Environment(*coordinates["UB"])
+    # env.fetchOpenMeteoData(validProperties, days=1)
+    # print(env.getAtHeight("windSpeed", 320, 3))
+    # for height in range(0, 1000, 100):
+    #     print(env.getAtHeight("windSpeed", height, 1))
 
 
 if __name__ == "__main__":
