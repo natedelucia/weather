@@ -122,7 +122,6 @@ def fetch_historical_data(
     }
 
     response: WeatherApiResponse = fetch_data(url, params)
-
     hourly: VariablesWithTime = response.Hourly()
 
     numHeightSteps = len(heightSteps)
@@ -136,20 +135,8 @@ def fetch_current_data(
     lat: float, lon: float, properties: list[str], days: int
 ) -> dict[str, np.ndarray]:
     """Fetch data from openMeteo API"""
-
-    # This isn't very good practice and should probably be changed
-    validateDays(days)
-    validateProperties(properties)
-
-    cache_session = requests_cache.CachedSession(".cache", expire_after=3600)
-    retry_session = retry(cache_session, retries=5, backoff_factor=0.2)
-    openmeteo = openmeteo_requests.Client(session=retry_session)
-
-    # Construct the properties that are desired in the necessary format for the API call
-    callProperties = [propertiesMap[prop] for prop in properties]
-
     url = "https://api.open-meteo.com/v1/forecast"
-
+    callProperties = [propertiesMap[prop] for prop in properties]
     params = {
         "latitude": lat,
         "longitude": lon,
@@ -159,8 +146,7 @@ def fetch_current_data(
         "forecast_days": days,
     }
 
-    response: WeatherApiResponse = openmeteo.weather_api(url, params=params)[0]
-
+    response: WeatherApiResponse = fetch_data(url, params)
     hourly: VariablesWithTime = response.Hourly()
 
     numHeightSteps = len(heightSteps)

@@ -51,6 +51,13 @@ class Environment:
             )
 
         return np.interp(height, heightSteps, self.atmosphere[property][hour])
+    
+    def graph(self, properties: list[str]):
+        for property in properties:
+            for i in range(self.atmosphere[property].shape[1]):
+                plt.plot(self.atmosphere[property][:,i], label=f"{property} at {heightSteps[i]}m")
+        plt.legend()
+        plt.show()
 
 class HistoricalEnvironment(Environment):
     def __init__(self, lat: float, lon: float, start_date: date, end_date: date) -> None:
@@ -59,16 +66,17 @@ class HistoricalEnvironment(Environment):
         self.end_date = end_date
     
     def fetchOpenMeteoData(
-        self, properties: list[str], days: int
+        self, properties: list[str], days=None
     ) -> dict[str, np.ndarray]:
         self.atmosphere = fetch_historical_data(self.lat, self.lon, properties, self.start_date, self.end_date)
         return self.atmosphere
 
 # Mostly for testing, but it does show the proper use of some of the functions so I guess I'll leave it
 def main():
-    env = HistoricalEnvironment(*coordinates["UB"], date(2024, 1, 1), date(2024, 1, 31))
-    env.fetchOpenMeteoData(validProperties, days=1)
-    print(env.getAtHeight("temp", 320, 3))
+    env = HistoricalEnvironment(*coordinates["Texas"], date(2024, 1, 1), date(2024, 12, 31))
+    # env = Environment(*coordinates["Texas"])
+    env.fetchOpenMeteoData(validProperties, 3)
+    env.graph(["temp"])
 
     # env = Environment(*coordinates["UB"])
     # env.fetchOpenMeteoData(validProperties, days=1)
